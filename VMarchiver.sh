@@ -2,7 +2,7 @@
 
 
 # VMarchiver.sh
-VERSION="1.9.3"
+VERSION="1.9.4"
 # Script to list ZFS zvols, QCOW2 disks, and Libvirt VMs
 
 
@@ -70,18 +70,6 @@ get_qcow2_snapshots() {
     qemu-img snapshot -l "$disk_path" 2>/dev/null | grep -c '^[0-9]'
 }
 
-# Function to get VM UUID
-get_vm_uuid() {
-    local vm=$1
-    virsh domuuid "$vm" 2>/dev/null
-}
-
-# Function to check if VM exists
-vm_exists() {
-    virsh list --all --name | grep -q "^$1$"
-}
-
-
 find_associated_vm_qcow2() {
     local qcow2_file=$1
     local vm_name=$(virsh list --all --name | while read vm; do
@@ -110,27 +98,26 @@ find_associated_vm_zvol() {
 }
 
 
-
 # Function to list QCOW2 files
 list_qcow2_files() {
     echo "VMarchiver v$VERSION - Listing QCOW2 files in $QCOW2_PATH:"
     echo "-------------------------------------"
     printf "%-45s %-25s %-15s %-15s %-10s\n" "File Name" "VM" "Size" "Used" "Snapshots"
     echo "-------------------------------------"
-    
+
     find "$QCOW2_PATH" -name "*.qcow2" | sort | while read -r file; do
         filename=$(basename "$file")
         vm_name=$(find_associated_vm_qcow2 "$filename")
         vm_name=${vm_name:--}  # Use '-' if vm_name is empty
-        
+
         size=$(qemu-img info "$file" 2>/dev/null | awk '/virtual size:/ {print $3$4}')
         used=$(qemu-img info "$file" 2>/dev/null | awk '/disk size:/ {print $3$4}')
         snapshots=$(qemu-img snapshot -l "$file" 2>/dev/null | grep -c '^[0-9]')
-        
+
         # Ensure consistent formatting
         size=$(echo "$size" | sed 's/\.00//g')  # Remove .00 if present
         used=$(echo "$used" | sed 's/\.00//g')  # Remove .00 if present
-        
+
         # Use echo instead of printf to avoid issues with special characters
         echo -e "$(printf "%-45s %-25s %-15s %-15s %-10s" "$filename" "$vm_name" "$size" "$used" "$snapshots")"
     done
@@ -189,6 +176,18 @@ list_storage_volumes() {
     done
 }
 
+# Function to check if VM exists
+vm_exists() {
+    virsh list --all --name | grep -q "^$1$"
+}
+
+# Function to get VM UUID
+get_vm_uuid() {
+    local vm=$1
+    virsh domuuid "$vm" 2>/dev/null
+}
+
+
 # Function to list all Libvirt VMs
 list_libvirt_vms() {
     local show_uuid=$1
@@ -244,6 +243,7 @@ list_libvirt_vms() {
 }
 
 
+
 # Function to display help
 show_help() {
     echo "VMarchiver v$VERSION"
@@ -265,6 +265,7 @@ show_help() {
 }
 
 
+# Main menu
 # Main menu
 if [ $# -eq 0 ]; then
     show_help
